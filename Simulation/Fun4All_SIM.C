@@ -8,12 +8,6 @@ void Fun4All_SIM(
 {
 
   /////////////////////////
-  bool use_fvtx = true;
-  bool use_svx = true;
-  bool fill_mc_info = true;
-  bool use_eval = true;
-  bool write_pdst = false;
-
   bool debug = false;
   int verbosity = 0;
   if(debug) verbosity = 5;
@@ -38,12 +32,8 @@ void Fun4All_SIM(
   gSystem->Load("libPHGeant" );
   gSystem->Load("libsimreco_base");
   gSystem->Load("libmuon_subsysreco");
-  gSystem->Load("librpc_subsysreco");
-  gSystem->Load("librpc_muotrackreco");
   gSystem->Load("libfun4allfuncs_muons");
   gSystem->Load("libsvx");
-  gSystem->Load("liblvl2");
-  gSystem->Load("libPythia6.so");
   gSystem->Load("libPHPythia.so");
   gSystem->Load("libPHPythiaEventGen.so");
   gSystem->Load("/gpfs/mnt/gpfs02/phenix/hhj/hhj1/shlim/work/PHENIX_muon_ana_intro/Simulation/picoDST_object/install/lib/libpicodst_object.so");
@@ -54,7 +44,7 @@ void Fun4All_SIM(
   // recoConsts setup
   //////////////////////////////////////////
   recoConsts *rc = recoConsts::instance();
-  rc->set_IntFlag("SVXACTIVE", use_svx);
+  rc->set_IntFlag("SVXACTIVE", true);
   rc->set_IntFlag("PRINT_MUTOO_PARAMETERS",1);
   rc->set_IntFlag("RUNNUMBER", run);
   rc->set_IntFlag("MUONFUN4SIM",1);
@@ -66,7 +56,7 @@ void Fun4All_SIM(
   // FVTX+MUTR setup
   //////////////////////////////////////////
   TFvtxGlobalParCntrl::set_bool_par("is_pp",true);
-  TFvtxGlobalParCntrl::set_bool_par("use_svx",use_svx);
+  TFvtxGlobalParCntrl::set_bool_par("use_svx",true);
   TFvtxGlobalParCntrl::set_bool_par("is_sim",true);
   TFvtxGlobalParCntrl::set_bool_par("deadmap_use_calibration_database", true);
   TFvtxGlobalParCntrl::set_bool_par("deadmap_use_production_map_for_sim", true);
@@ -92,7 +82,6 @@ void Fun4All_SIM(
 	std::string muid_eff_north("muid_tube_eff_north_Run15pp200.txt");
 
 	{
-		std::cout << "using local two pack efficiciency files:" << muid_eff_south << ", "  << muid_eff_north << std::endl;
 		TMuiHVMask::set_mode(TMuiHVMask::FROM_FILE);
 		TMuiHVMask::set_filename_south(muid_eff_south.c_str());
 		TMuiHVMask::set_filename_north(muid_eff_north.c_str());
@@ -133,164 +122,140 @@ void Fun4All_SIM(
   // global detectors subsystem
   se->registerSubsystem( new VtxReco() );
 
-  if(use_svx)
-	{
+	// SVX reconstruction
+	SvxParManager *svxpar = new SvxParManager();
+	svxpar->Verbosity(verbosity);
+	svxpar->set_UseRefDiffPixelMap(1);
 
-		// SVX reconstruction
-		SvxParManager *svxpar = new SvxParManager();
-		svxpar->Verbosity(verbosity);
-		svxpar->set_UseRefDiffPixelMap(1);
+	svxpar->set_OffsetVtxToCnt(0.0, 0.0, 0.0);
+	svxpar->set_OffsetEastToWest(0.0, 0.0, 0.0);
+	svxpar->set_ReadGeoParFromFile(1);
+	svxpar->set_GeometryFileName("svxPISA.par"); 
+	svxpar->set_UseStripThresholdDatbase(true);
+	se->registerSubsystem(svxpar);
 
-		svxpar->set_OffsetVtxToCnt(0.0, 0.0, 0.0);
-		svxpar->set_OffsetEastToWest(0.0, 0.0, 0.0);
-		svxpar->set_ReadGeoParFromFile(1);
-		svxpar->set_GeometryFileName("svxPISA.par"); 
-		svxpar->set_UseStripThresholdDatbase(true);
-		se->registerSubsystem(svxpar);
+	SvxSimulator *svxsim = new SvxSimulator();
+	svxsim->Verbosity(verbosity);
+	se->registerSubsystem(svxsim);
 
-		SvxSimulator *svxsim = new SvxSimulator();
-		svxsim->Verbosity(verbosity);
-		se->registerSubsystem(svxsim);
+	SvxApplyHotDead *svxhotdead = new SvxApplyHotDead();
+	svxhotdead->Verbosity(verbosity);
+	se->registerSubsystem(svxhotdead);
 
-		SvxApplyHotDead *svxhotdead = new SvxApplyHotDead();
-		svxhotdead->Verbosity(verbosity);
-		se->registerSubsystem(svxhotdead);
+	SvxReco *svxrec = new SvxReco();
+	svxrec->Verbosity(verbosity);
+	svxrec->set_ThisIsSimulation();
+	svxrec->set_StripixelAdcSumThreshold(0);
+	se->registerSubsystem(svxrec);
 
-		SvxReco *svxrec = new SvxReco();
-		svxrec->Verbosity(verbosity);
-		svxrec->set_ThisIsSimulation();
-		svxrec->set_StripixelAdcSumThreshold(0);
-		se->registerSubsystem(svxrec);
+	SvxPriVertexSeedFinder *svxvtxseedfinder = new SvxPriVertexSeedFinder();
+	svxvtxseedfinder->Verbosity(verbosity);
+	se->registerSubsystem(svxvtxseedfinder);
 
-		SvxPriVertexSeedFinder *svxvtxseedfinder = new SvxPriVertexSeedFinder();
-		svxvtxseedfinder->Verbosity(verbosity);
-		se->registerSubsystem(svxvtxseedfinder);
-
-		SvxStandAloneReco *svxstandalone = new SvxStandAloneReco();
-		svxstandalone->Verbosity(verbosity);
-		svxstandalone->setVertexRecoFlag(2);
-		svxstandalone->setPPFlag(true);
-		se->registerSubsystem(svxstandalone);
-
-		SvxPrimVertexFinder *svxprimvtxfinder = new SvxPrimVertexFinder();
-		svxprimvtxfinder->Verbosity(verbosity);
-		se->registerSubsystem(svxprimvtxfinder);
-	}
+	SvxStandAloneReco *svxstandalone = new SvxStandAloneReco();
+	svxstandalone->Verbosity(verbosity);
+	svxstandalone->setVertexRecoFlag(2);
+	svxstandalone->setPPFlag(true);
+	se->registerSubsystem(svxstandalone);
 
   // muon prdf unpacker
   MuonUnpackPisa *muon_unpack_pisa =  new MuonUnpackPisa();
-  muon_unpack_pisa->Verbosity(0);
+  muon_unpack_pisa->Verbosity(verbosity);
   muon_unpack_pisa->set_flag(MuonUnpackPisa::DO_RESPONSE,1);
   se->registerSubsystem( muon_unpack_pisa );
 
-  // muioo/mutoo reconstruction
+  // FVTX reconstruction 
+	FvtxUnpackPisa *fvtx_unpack = new FvtxUnpackPisa();
+	se->registerSubsystem( fvtx_unpack );
+
+	FvtxReco* fvtxreco = new FvtxReco();
+	se->registerSubsystem(fvtxreco);
+
+	FvtxPrimVertex* fvtxprimvtx = new FvtxPrimVertex();
+	fvtxprimvtx->set_source(FvtxPrimVertex::Tracks,FvtxPrimVertex::Segments);
+	se->registerSubsystem(fvtxprimvtx);
+
+  // MuID/MuTr reconstruction
   se->registerSubsystem( new MuiooReco() );
 
   MuonDev *muon_dev = new MuonDev();
   se->registerSubsystem( muon_dev );
 
-  // fvtx prdf unpacker
-  if (use_fvtx)
-	{
-		FvtxUnpackPisa *fvtx_unpack = new FvtxUnpackPisa();
-		se->registerSubsystem( fvtx_unpack );
-
-		FvtxReco* fvtxreco = new FvtxReco();
-		se->registerSubsystem(fvtxreco);
-
-		FvtxPrimVertex* fvtxprimvtx = new FvtxPrimVertex();
-		fvtxprimvtx->set_source(FvtxPrimVertex::Tracks,FvtxPrimVertex::Segments);
-		se->registerSubsystem(fvtxprimvtx);
-
-		// Perform FVTX-Mutr track matching and refit track:
-		FvtxRecoWithMut *fvtx_reco_withmut = new FvtxRecoWithMut();
-		se->registerSubsystem( fvtx_reco_withmut );
-	}
+	// Perform FVTX-Mutr track matching and refit track:
+	FvtxRecoWithMut *fvtx_reco_withmut = new FvtxRecoWithMut();
+	se->registerSubsystem( fvtx_reco_withmut );
 
 	//MC evaluation
-  if(use_eval)
-	{
-		MuonEval* mueval = new MuonEval();
-		mueval->set_flags(0); // no ntuple output needed
-		se->registerSubsystem (mueval);
-	}
+	MuonEval* mueval = new MuonEval();
+	mueval->set_flags(0); // no ntuple output needed
+	se->registerSubsystem (mueval);
 
-  if (use_fvtx && use_eval)
-	{
-		FvtxEval* fvtxeval = new FvtxEval("FvtxEval","fvtx_eval_pisa.root");
-		se->registerSubsystem(fvtxeval);
-		FvtxMCEval* fvtxeval_mc = new FvtxMCEval("FvtxMCEval","fvtx_mc_eval_pisa.root");
-		se->registerSubsystem(fvtxeval_mc);
-	}
+	FvtxEval* fvtxeval = new FvtxEval("FvtxEval","fvtx_eval_pisa.root");
+	se->registerSubsystem(fvtxeval);
+	FvtxMCEval* fvtxeval_mc = new FvtxMCEval("FvtxMCEval","fvtx_mc_eval_pisa.root");
+	se->registerSubsystem(fvtxeval_mc);
 
 	se->registerSubsystem( new GlobalReco() );
 	se->registerSubsystem( new GlobalReco_muons() );
-  
   
   ///////////////////////////////////////////
   // IOManagers...
   ///////////////////////////////////////////
 
   // picoDST
-  if( write_pdst )
+	gSystem->Load("libMWGOO.so");
+	PHInclusiveNanoCuts *MWGcuts = new MWGInclusiveNanoCutsv2();
+	se->registerSubsystem(new MWGFvtxReco(MWGcuts));
+
+	//single muon container
+	mFillSingleMuonContainer* msngl = new mFillSingleMuonContainer();
+	msngl->set_is_sim(true);
+	se->registerSubsystem(msngl);
+
+	//dimuon container
+	mFillDiMuonContainer* mdi = new mFillDiMuonContainer(false);
+	mdi->set_is_sim(true);
+	mdi->set_is_pp(true);
+	mdi->set_mass_cut(1.0);
+	se->registerSubsystem(mdi);
+
+	//trigger emulator
+	mFillTriggerEmulatorContainer *mtrig_emul = new mFillTriggerEmulatorContainer();
+	se->registerSubsystem(mtrig_emul);
+
+	//MC single muon container
+	mFillMCSingleMuonFvtxContainer* msngl_mc = new mFillMCSingleMuonFvtxContainer();
+	se->registerSubsystem(msngl_mc);
+
+	//MC dimuon container
+	mFillMCDiMuonContainer* mdi_mc = new mFillMCDiMuonContainer();
+	se->registerSubsystem(mdi_mc);
+
+	//HEPMC container for Pythia8 event
+	if(!pythiaFile.empty())
 	{
-		// MWG
-		gSystem->Load("libMWGOO.so");
-		PHInclusiveNanoCuts *MWGcuts = new MWGInclusiveNanoCutsv2();
-		se->registerSubsystem(new MWGFvtxReco(MWGcuts));
-
-		//single muon container
-		mFillSingleMuonContainer* msngl = new mFillSingleMuonContainer();
-		msngl->set_is_sim(true);
-		se->registerSubsystem(msngl);
-
-		//dimuon container
-		mFillDiMuonContainer* mdi = new mFillDiMuonContainer(false);
-		mdi->set_is_sim(true);
-		mdi->set_is_pp(true);
-		mdi->set_mass_cut(1.0);
-		se->registerSubsystem(mdi);
-
-		//trigger emulator
-		mFillTriggerEmulatorContainer *mtrig_emul = new mFillTriggerEmulatorContainer();
-		se->registerSubsystem(mtrig_emul);
-
-		if(fill_mc_info)
-		{
-			//MC single muon container
-			mFillMCSingleMuonFvtxContainer* msngl_mc = new mFillMCSingleMuonFvtxContainer();
-			se->registerSubsystem(msngl_mc);
-
-			//MC dimuon container
-			mFillMCDiMuonContainer* mdi_mc = new mFillMCDiMuonContainer();
-			se->registerSubsystem(mdi_mc);
-
-			//HEPMC container for Pythia8 event
-			if(!pythiaFile.empty())
-			{
-				mFillMCHepMCParticleContainer* gen_event = new mFillMCHepMCParticleContainer();
-				gen_event->SetNodeName("PHHepMCGenEvent_SIGNAL");
-				se->registerSubsystem(gen_event); 
-			}
-		}
-
-		//output manager
-		Fun4AllOutputManager *outsmu = new Fun4AllDstOutputManager("Outsmu",outputPDST.c_str());
-		outsmu->AddNode("SingleMuonContainer");
-		outsmu->AddNode("DiMuonContainer");
-		if (fill_mc_info) outsmu->AddNode("MCSingleMuonFvtxContainer");
-		if (fill_mc_info) outsmu->AddNode("MCDiMuonContainer");
-		outsmu->AddNode("Sync");
-		outsmu->AddNode("TrigLvl1");
-		outsmu->AddNode("VtxOut");
-		outsmu->AddNode("PHGlobal");
-		outsmu->AddNode("RunHeader");
-		outsmu->AddNode("EventHeader");
-		outsmu->AddNode("TriggerEmulatorContainer");
-		//outsmu->AddEventSelector("mFillDiMuonContainer");
-		se->registerOutputManager(outsmu);
+		mFillMCHepMCParticleContainer* gen_event = new mFillMCHepMCParticleContainer();
+		gen_event->SetNodeName("PHHepMCGenEvent_SIGNAL");
+		se->registerSubsystem(gen_event); 
 	}
 
+	//output manager
+	Fun4AllOutputManager *outsmu = new Fun4AllDstOutputManager("Outsmu",outputPDST.c_str());
+	outsmu->AddNode("SingleMuonContainer");
+	outsmu->AddNode("DiMuonContainer");
+	outsmu->AddNode("MCSingleMuonFvtxContainer");
+	outsmu->AddNode("MCDiMuonContainer");
+	outsmu->AddNode("Sync");
+	outsmu->AddNode("TrigLvl1");
+	outsmu->AddNode("VtxOut");
+	outsmu->AddNode("PHGlobal");
+	outsmu->AddNode("RunHeader");
+	outsmu->AddNode("EventHeader");
+	outsmu->AddNode("TriggerEmulatorContainer");
+	//outsmu->AddEventSelector("mFillDiMuonContainer");
+	se->registerOutputManager(outsmu);
+
+	//PISA event file
 	Fun4AllPisaInputManager *inMan = new Fun4AllPisaInputManager("PisaIn");
 	se->registerInputManager(inMan);
 	TString tmp = pisaFile;
@@ -312,6 +277,7 @@ void Fun4All_SIM(
 		se->fileopen(inMan->Name(),pisaFile.c_str());
 	}
 
+	//PYTHIA event file
 	if (!pythiaFile.empty())
 	{
 		Fun4AllDstInputManager *ipythia = new Fun4AllNoSyncDstInputManager("DSTin","DST");
