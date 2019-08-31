@@ -1,7 +1,6 @@
 void phpythia8(
 	       int nevents = 50, 
 				 int seed = 0,
-				 float minpT_jpsi = 1.0,
 	       std::string outputname = "pythia_mn"
 		)
 {
