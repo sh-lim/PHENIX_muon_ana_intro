@@ -37,11 +37,11 @@ void Run_picodstobject_tutorial(const char *outFile = "picodstobject.root")
 	se->registerSubsystem(msngl);
 
 	//dimuon container
-  mFillDiMuonContainer* mdi = new mFillDiMuonContainer(false);
+  mFillDiMuonContainer* mdi = new mFillDiMuonContainer(false); //true: with mixed event, false: without mixed event
 	mdi->set_is_sim(false);
 	mdi->set_bbcz_cut(30.0); //bbcz cut
 	mdi->set_mass_cut(1.0); //mass cut for dimuon
-	mdi->set_is_pp(false); //save centrality information
+	mdi->set_is_pp(true); //save centrality information
 	se->registerSubsystem(mdi);
 
 	//output manager
@@ -62,7 +62,7 @@ void Run_picodstobject_tutorial(const char *outFile = "picodstobject.root")
 void 
 InputData(vector<string> &indata)
 {
-  indata.push_back("CNT");
+  //indata.push_back("CNT");
   indata.push_back("MWG");
   return;
 }
