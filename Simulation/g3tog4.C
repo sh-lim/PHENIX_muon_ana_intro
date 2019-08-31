@@ -19,7 +19,9 @@ void g3tog4(
   SubsysReco *sync = new SyncSimreco();
   se->registerSubsystem(sync);
 
+	//init with files for magnetic field and geometry file
 	PHG3toG4 *myG3toG4 = new PHG3toG4("PHG3toG4","Sim3D++.root","geom_run15.root");
+	//node name of Pythia8 event
   myG3toG4->AddNode("PHHepMCGenEvent_SIGNAL");
   se->registerSubsystem(myG3toG4);
 
